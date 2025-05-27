@@ -25,6 +25,24 @@ def get_drive_service():
     )
     return build('drive', 'v3', credentials=creds)
 
+# ============ DEBUG FUNCTION ===============
+def debug_list_files():
+    service = get_drive_service()
+    try:
+        results = service.files().list(
+            q=f"'{DRIVE_FOLDER_ID}' in parents",
+            fields="files(id, name)"
+        ).execute()
+        files = results.get('files', [])
+        if not files:
+            print(f"Folderul {DRIVE_FOLDER_ID} este gol sau inaccesibil.")
+        else:
+            print(f"Fișiere găsite în folderul {DRIVE_FOLDER_ID}:")
+            for f in files:
+                print(f" - {f['name']} (ID: {f['id']})")
+    except Exception as e:
+        print(f"⚠️ Eroare la listarea fișierelor: {e}")
+
 # ============ PUBLISHED.JSON SYNC ===============
 def load_published(service):
     try:
@@ -37,13 +55,11 @@ def load_published(service):
         fh.seek(0)
         data = json.load(fh)
 
-        # Dacă JSON-ul este listă, o convertim în dict conform așteptărilor
         if isinstance(data, list):
             return {"published_ids": data, "last_published_date": ""}
         elif isinstance(data, dict):
             return data
         else:
-            # alt tip neașteptat, inițializare default
             return {"published_ids": [], "last_published_date": ""}
     except Exception as e:
         print(f"⚠️ Eroare la citirea published.json: {e}")
@@ -135,4 +151,4 @@ def main():
             break  # publică doar un articol per rulare
 
 if __name__ == "__main__":
-    main()
+    debug_list_files()
