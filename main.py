@@ -151,4 +151,5 @@ def main():
             break  # publică doar un articol per rulare
 
 if __name__ == "__main__":
-    debug_list_files()
+    main()
+
