@@ -1,17 +1,17 @@
 import os
 import json
-import time
 import requests
 from io import BytesIO
 from docx import Document
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+from datetime import datetime
 
 # ============ CONFIG ===============
 GOOGLE_SERVICE_ACCOUNT = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
 DRIVE_FOLDER_ID = os.environ["GOOGLE_DRIVE_FOLDER_ID"]
-PUBLISHED_FILE_ID = os.environ["PUBLISHED_FILE_ID"]  # <- ID-ul fișierului published.json de pe Drive
+PUBLISHED_FILE_ID = os.environ["PUBLISHED_FILE_ID"]  # ID-ul fișierului published.json de pe Drive
 WP_URL = os.environ["WP_URL"]
 WP_USER = os.environ["WP_USER"]
 WP_PASS = os.environ["WP_PASS"]
@@ -38,11 +38,12 @@ def load_published(service):
         return json.load(fh)
     except Exception as e:
         print(f"⚠️ Eroare la citirea published.json: {e}")
-        return []
+        # Dacă nu există, inițializează structura
+        return {"published_ids": [], "last_published_date": ""}
 
-def save_published(service, published_list):
+def save_published(service, published_data):
     try:
-        data = json.dumps(published_list, indent=2).encode('utf-8')
+        data = json.dumps(published_data, indent=2).encode('utf-8')
         media_body = MediaIoBaseUpload(BytesIO(data), mimetype='application/json')
         service.files().update(fileId=PUBLISHED_FILE_ID, media_body=media_body).execute()
     except Exception as e:
@@ -98,11 +99,19 @@ def publish_to_wp(title, content_html):
 # ============ MAIN LOGIC ===============
 def main():
     service = get_drive_service()
-    published = load_published(service)
+    published_data = load_published(service)
+    published_ids = published_data.get("published_ids", [])
+    last_date = published_data.get("last_published_date", "")
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    if today == last_date:
+        print("🛑 Astăzi deja s-a publicat un articol. Oprire.")
+        return
+
     files = list_docx_files(service)
 
     for file in files:
-        if file['id'] in published:
+        if file['id'] in published_ids:
             continue
 
         print(f"⏳ Procesare: {file['name']}")
@@ -111,11 +120,11 @@ def main():
         title = os.path.splitext(file['name'])[0]
 
         if publish_to_wp(title, html_content):
-            published.append(file['id'])
-            save_published(service, published)
-            print("⏲️ Aștept 2 zile până la următoarea publicare...")
-            time.sleep(60 * 60 * 24 * 2)  # 2 zile
-            break  # publică doar 1 articol per rulare
+            published_ids.append(file['id'])
+            published_data["published_ids"] = published_ids
+            published_data["last_published_date"] = today
+            save_published(service, published_data)
+            break  # publică doar un articol per rulare
 
 if __name__ == "__main__":
     main()
