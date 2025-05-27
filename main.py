@@ -35,10 +35,18 @@ def load_published(service):
         while not done:
             _, done = downloader.next_chunk()
         fh.seek(0)
-        return json.load(fh)
+        data = json.load(fh)
+
+        # Dacă JSON-ul este listă, o convertim în dict conform așteptărilor
+        if isinstance(data, list):
+            return {"published_ids": data, "last_published_date": ""}
+        elif isinstance(data, dict):
+            return data
+        else:
+            # alt tip neașteptat, inițializare default
+            return {"published_ids": [], "last_published_date": ""}
     except Exception as e:
         print(f"⚠️ Eroare la citirea published.json: {e}")
-        # Dacă nu există, inițializează structura
         return {"published_ids": [], "last_published_date": ""}
 
 def save_published(service, published_data):
